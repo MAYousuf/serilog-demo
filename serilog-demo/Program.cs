@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http.Features;
+using serilog_demo;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -25,7 +27,24 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
+    builder.Services.AddProblemDetails(options =>
+    {
+        options.CustomizeProblemDetails = context =>
+        {
+            context.ProblemDetails.Instance =
+                $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+
+            context.ProblemDetails.Extensions.TryAdd("requestId", context.HttpContext.TraceIdentifier);
+            var activity = context.HttpContext.Features.Get<IHttpActivityFeature>()?.Activity;
+            context.ProblemDetails.Extensions.TryAdd("traceId", activity?.Id);
+        };
+    });
+
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+    
     var app = builder.Build();
+    
+    app.UseExceptionHandler(opt => { });
 
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
@@ -65,6 +84,22 @@ try
         })
         .WithName("GetWeatherForecast")
         .WithOpenApi();
+    
+    app.MapGet("/error", () =>
+        {
+            throw new Exception("An unhandled exception has occurred.");
+            var forecast = Enumerable.Range(1, 5).Select(index =>
+                    new WeatherForecast
+                    (
+                        DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                        Random.Shared.Next(-20, 55),
+                        summaries[Random.Shared.Next(summaries.Length)]
+                    ))
+                .ToArray();
+            return forecast;
+        })
+        .WithName("error")
+        .WithOpenApi();
 
     app.Run();
     
@@ -90,4 +125,3 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
-
