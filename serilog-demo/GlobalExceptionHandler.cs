@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace serilog_demo;
 
-public class GlobalExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
+public class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
         CancellationToken cancellationToken)
@@ -21,7 +23,8 @@ public class GlobalExceptionHandler(IProblemDetailsService problemDetailsService
         //
         //     problemDetails.Extensions.Add("errors", fluentEx.Errors);
         // }
-
+        
+        logger.LogError(exception, exception.Message);
 
         httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
 
